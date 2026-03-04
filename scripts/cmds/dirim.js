@@ -1,57 +1,39 @@
-const axios = require("axios");
-const fs = require("fs-extra");
-const path = require("path");
-
 module.exports = {
 config: {
 name: "dirim",
-version: "1.0.5",
-author: "Anik Islam Sadik",
-countDown: 1, // সময় কমিয়ে ১ সেকেন্ড করা হলো
+version: "1.0.0",
 role: 0,
-shortDescription: "Ultra Fast Voice Reply",
-longDescription: "Sends specific voice messages instantly using local cache",
-category: "system"
+author: "Milon",
+description: "কেউ dirim বললে ভয়েজ রিপ্লাই দিবে",
+category: "funny",
+guide: "{pn}",
+countDown: 5
 },
 
-onStart: async function () {},
+onStart: async function ({ message, event }) {
+// সরাসরি কমান্ড দিলে যা হবে
+const voiceUrl = "https://files.catbox.moe/t0l0cg.mp3";
+return message.reply({
+body: "এই নিন আপনার ভয়েজ!",
+attachment: await global.utils.getStreamFromURL(voiceUrl)
+});
+},
 
-onChat: async function ({ event, message }) {
-if (!event.body) return;
+onChat: async function ({ message, event }) {
+// চ্যাটে কেউ 'dirim' শব্দটা লিখলে অটোমেটিক কাজ করবে
+const { body } = event;
+if (!body) return;
 
-const input = event.body.toLowerCase().trim();
+const triggerWord = "dirim";
+const voiceUrl = "https://files.catbox.moe/w3y1b5.mp3";
 
-// --- কি-ওয়ার্ড এবং লিংক ---
-const voiceMap = {
-"i love you": "https://files.catbox.moe/reh1hr.mp4",
-"milon": "https://files.catbox.moe/hwgaqs.mp4",
-"dirim": "https://files.catbox.moe/1rk48q.mp4",
-"hello": "লিংক_এখানে"
-};
-
-if (voiceMap[input]) {
-const audioUrl = voiceMap[input];
-const cacheDir = path.join(__dirname, "cache", "voices");
-fs.ensureDirSync(cacheDir);
-
-// ফাইলের নাম কি-ওয়ার্ড অনুযায়ী সেভ হবে যাতে বারবার ডাউনলোড না লাগে
-const fileName = `${Buffer.from(input).toString('hex')}.mp3`;
-const filePath = path.join(cacheDir, fileName);
-
+if (body.toLowerCase().includes(triggerWord)) {
 try {
-// যদি ফাইলটি আগে থেকেই ডাউনলোড করা থাকে, তবে সরাসরি পাঠিয়ে দিবে
-if (fs.existsSync(filePath)) {
-return await message.reply({ attachment: fs.createReadStream(filePath) });
-}
-
-// ফাইল না থাকলে ডাউনলোড করবে (শুধু প্রথমবার)
-const response = await axios.get(audioUrl, { responseType: "arraybuffer" });
-fs.writeFileSync(filePath, Buffer.from(response.data));
-
-await message.reply({ attachment: fs.createReadStream(filePath) });
-
-} catch (error) {
-console.error("Error sending voice:", error);
+return message.reply({
+attachment: await global.utils.getStreamFromURL(voiceUrl)
+});
+} catch (err) {
+console.error("Error sending voice in GoatBot:", err);
 }
 }
 }

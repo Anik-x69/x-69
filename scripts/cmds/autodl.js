@@ -2,92 +2,104 @@ const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
 
-const supportedDomains = [
-  "facebook.com", "fb.watch",
-  "youtube.com", "youtu.be",
-  "tiktok.com",
-  "instagram.com", "instagr.am",
-  "likee.com", "likee.video",
-  "capcut.com",
-  "spotify.com",
-  "terabox.com",
-  "twitter.com", "x.com",
-  "drive.google.com",
-  "soundcloud.com",
-  "ndown.app",
-  "pinterest.com", "pin.it"
+function detectPlatform(url) {
+  if (url.includes("tiktok.com")) return "𝙏𝙞𝙠𝙏𝙤𝙠";
+  if (url.includes("facebook.com") || url.includes("fb.watch")) return "𝙁𝙖𝙘𝙚𝙗𝙤𝙤𝙠";
+  if (url.includes("instagram.com")) return "𝙄𝙣𝙨𝙩𝙖𝙜𝙖𝙢";
+  if (url.includes("youtube.com") || url.includes("youtu.be")) return "𝙔𝙤𝙪𝙏𝙪𝙗𝙚";
+  if (url.includes("x.com") || url.includes("twitter.com")) return "𝙏𝙬𝙞𝙩𝙩𝙚𝙧 / 𝙓";
+  if (url.includes("pin.it") || url.includes("pinterest.com")) return "𝙋𝙞𝙣𝙩𝙚𝙧𝙚𝙨𝙩";
+  return "𝙐𝙣𝙠𝙣𝙤𝙬𝙣";
+}
+
+function extractVideo(data) {
+  if (!data) return null;
+  const r = data.result || {};
+  return (
+    r.high_quality ||
+    r.video ||
+    r.url ||
+    data.high_quality ||
+    data.video ||
+    data.url ||
+    null
+  );
+}
+
+const SUPPORTED = [
+  "https://vt.tiktok.com", "https://www.tiktok.com/", "https://vm.tiktok.com",
+  "https://www.facebook.com/watch/", "https://www.facebook.com/reel/",
+  "https://www.facebook.com/share/v", "https://www.facebook.com/share/r",
+  "https://www.instagram.com/reel/", "https://youtu.be/", "https://youtube.com/",
+  "https://x.com/", "https://twitter.com/", "https://pin.it/", "https://www.pinterest.com/"
 ];
 
 module.exports = {
   config: {
     name: "autodl",
-    version: "2.0",
-    author: "Saimx69x",
+    version: "6.5",
+    author: "Toshiro Editz",
     role: 0,
-    shortDescription: "All-in-one video/media downloader",
-    longDescription:
-      "Automatically downloads videos or media from Facebook, YouTube, TikTok, Instagram, Likee, CapCut, Spotify, Terabox, Twitter, Google Drive, SoundCloud, NDown, Pinterest, and more.",
-    category: "utility",
-    guide: { en: "Just send any supported media link (https://) to auto-download." }
+    category: "media",
+    description: { en: "Auto download videos from multiple platforms" },
+    guide: { en: "[video link]" }
   },
 
-  onStart: async function({ api, event }) {
-    api.sendMessage(
-      "📥 Send a video/media link (https://) from any supported site (YouTube, Facebook, TikTok, Instagram, Likee, CapCut, Spotify, Terabox, Twitter, Google Drive, SoundCloud, NDown, Pinterest, etc.) to auto-download.",
-      event.threadID,
-      event.messageID
-    );
-  },
+  onStart: async function () {},
 
-  onChat: async function({ api, event }) {
-    const content = event.body ? event.body.trim() : "";
-    if (content.toLowerCase().startsWith("auto")) return;
-    if (!content.startsWith("https://")) return;
-    if (!supportedDomains.some(domain => content.includes(domain))) return;
+  onChat: async function ({ api, event }) {
+    const text = event.body || "";
+    if (!text.startsWith("http")) return;
+    if (!SUPPORTED.some(link => text.startsWith(link))) return;
 
-    api.setMessageReaction("⌛️", event.messageID, () => {}, true);
+    api.setMessageReaction("🐤", event.messageID, event.threadID, (err) => {}, true);
+    const startTime = Date.now();
 
     try {
-      const API = `https://xsaim8x-xxx-api.onrender.com/api/auto?url=${encodeURIComponent(content)}`;
-      const res = await axios.get(API);
+      const cacheDir = path.join(__dirname, "cache");
+      await fs.ensureDir(cacheDir);
+      const filePath = path.join(cacheDir, `autodl_${Date.now()}.mp4`);
 
-      if (!res.data) throw new Error("No response from API");
-
-      const mediaURL = res.data.high_quality || res.data.low_quality;
-      const mediaTitle = res.data.title || "Unknown Title";
-      if (!mediaURL) throw new Error("Media not found");
-
-      const extension = mediaURL.includes(".mp3") ? "mp3" : "mp4";
-      const buffer = (await axios.get(mediaURL, { responseType: "arraybuffer" })).data;
-      const filePath = path.join(__dirname, "cache", `auto_media_${Date.now()}.${extension}`);
-
-      await fs.ensureDir(path.dirname(filePath));
-      fs.writeFileSync(filePath, Buffer.from(buffer));
-
-      api.setMessageReaction("✅️", event.messageID, () => {}, true);
-      
-      const domain = supportedDomains.find(d => content.includes(d)) || "Unknown Platform";
-      const platformName = domain.replace(/(\.com|\.app|\.video|\.net)/, "").toUpperCase();
-
-      const infoCard = 
-`━━━━━━━━━━━━━━
-𝐌𝐞𝐝𝐢𝐚 𝐃𝐨𝐰𝐧𝐥𝐨𝐚𝐝𝐞𝐝 ✅
-╭─╼━━━━━━━━╾─╮
-│ Title      : ${mediaTitle}
-│ Platform   : ${platformName}
-│ Status     : Success
-╰─━━━━━━━━━╾─╯
-━━━━━━━━━━━━━━
-Made with ❤️ by Saimx69x.`;
-
-      api.sendMessage(
-        { body: infoCard, attachment: fs.createReadStream(filePath) },
-        event.threadID,
-        () => fs.unlinkSync(filePath),
-        event.messageID
+      const res = await axios.get(
+        "https://toshiro-editz-api.vercel.app/downloader/alldl?url=" + encodeURIComponent(text),
+        { timeout: 30000 }
       );
-    } catch {
-      api.setMessageReaction("❌️", event.messageID, () => {}, true);
+
+      const downloadUrl = extractVideo(res.data);
+
+      if (!downloadUrl) {
+        api.setMessageReaction("❌", event.messageID, event.threadID, (err) => {}, true);
+        return api.sendMessage("❌ Video not found or unsupported link", event.threadID);
+      }
+
+      const response = await axios.get(downloadUrl, {
+        responseType: "arraybuffer",
+        timeout: 45000
+      });
+
+      await fs.writeFile(filePath, Buffer.from(response.data));
+
+      const info = res.data.result || res.data;
+      const platform = detectPlatform(text);
+      const speed = ((Date.now() - startTime) / 1000).toFixed(2);
+
+      const msg = {
+        body: `╭━〔 ✅ 𝐀𝐮𝐭𝐨 𝐃𝐨𝐰𝐧𝐥𝐨𝐚𝐝 〕━╮\n┃ 📌 Title     : ${info.title || "No Title"}\n┃ 🌐 Platform  : ${platform}\n┃ 👤 Author    : ${info.author || "Unknown"}\n┃ ⚡ Speed     : ${speed}s\n╰━━━━━━━━━━━━━━━━╯\n⚡ Powered by —͟͞͞Sᴀ𓆩ᴅ𓆪ɪᴋ 모 ❄️`,
+        attachment: fs.createReadStream(filePath)
+      };
+
+      api.sendMessage(msg, event.threadID, (err, info) => {
+        if (err) {
+            console.error("Upload Error:", err);
+        }
+        api.setMessageReaction("✅", event.messageID, event.threadID, (err) => {}, true);
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      }, event.messageID);
+
+    } catch (err) {
+      console.error("AutoDL Error:", err);
+      api.setMessageReaction("❌", event.messageID, event.threadID, (err) => {}, true);
+      api.sendMessage(`❌ Error: ${err.message}`, event.threadID);
     }
   }
 };

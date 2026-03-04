@@ -1,95 +1,56 @@
 const axios = require("axios");
-const fs = require("fs-extra");
+const fs = require("fs");
 const path = require("path");
-
-const apiurl =
-  "https://raw.githubusercontent.com/Saim-x69x/sakura/main/ApiUrl.json";
-
-async function getApiUrl() {
-  const res = await axios.get(apiurl);
-  return res.data.apiv4;
-}
 
 module.exports = {
   config: {
     name: "4k",
-    aliases: ["upscale"],
-    version: "1.0",
-    author: "Saimx69x (Api by fahim)",
+    version: "2.0",
+    role: 0,
+    author: "Aryan Chauhan",
+    countDown: 5,
+    longDescription: "Upscale images to 4K resolution using iHancer AI.",
     category: "image",
-    shortDescription: "Upscale image to 4K",
-    longDescription: "Upscales replied or attached image to 4K quality",
-    guide: "{pn} (reply to image)"
+    guide: {
+      en: "{pn} reply to an image to upscale it (default: type=2, level=low)."
+    }
   },
 
-  onStart: async function ({ api, event }) {
-    let imageUrl = "";
-    let processingMsg;
-
-    try {
-      if (event.messageReply?.attachments?.length) {
-        imageUrl = event.messageReply.attachments[0].url;
-      } else if (event.attachments?.length) {
-        imageUrl = event.attachments[0].url;
-      } else {
-        return api.sendMessage(
-          "❌ Please reply to or attach an image.",
-          event.threadID,
-          event.messageID
-        );
-      }
-
-      processingMsg = await api.sendMessage(
-        "⏳ Upscaling image to 4K, please wait...",
-        event.threadID,
-        null,
-        event.messageID
-      );
-
-      const BASE_API = await getApiUrl();
-      const apiUrl = `${BASE_API}/4k?url=${encodeURIComponent(imageUrl)}`;
-
-      const res = await axios.get(apiUrl);
-
-      if (!res.data?.image) throw new Error("Invalid API response");
-
-      const imgPath = path.join(__dirname, "cache", `${Date.now()}_4k.jpg`);
-
-      const imgRes = await axios.get(res.data.image, {
-        responseType: "arraybuffer"
-      });
-
-      await fs.ensureDir(path.dirname(imgPath));
-      await fs.writeFile(imgPath, imgRes.data);
-
-      await api.sendMessage(
-        {
-          body: "✅ Image upscaled to 4K successfully!",
-          attachment: fs.createReadStream(imgPath)
-        },
-        event.threadID,
-        null,
-        event.messageID
-      );
-
-      if (processingMsg?.messageID) {
-        api.unsendMessage(processingMsg.messageID);
-      }
-
-      await fs.remove(imgPath);
-
-    } catch (error) {
-      console.error("4k command error:", error);
-
-      if (processingMsg?.messageID) {
-        api.unsendMessage(processingMsg.messageID);
-      }
-
-      api.sendMessage(
-        "❌ Failed to upscale image. Please try again later.",
-        event.threadID,
-        event.messageID
-      );
+  onStart: async function ({ message, event, args }) {
+    if (
+      !event.messageReply ||
+      !event.messageReply.attachments ||
+      !event.messageReply.attachments[0] ||
+      event.messageReply.attachments[0].type !== "photo"
+    ) {
+      return message.reply("⚠ Please reply to an image to upscale it.");
     }
+
+    const originalUrl = event.messageReply.attachments[0].url;
+    const type = args[0] && !isNaN(args[0]) ? args[0] : 2; // default method 2
+    const level = args[1] && ["low", "medium", "high"].includes(args[1].toLowerCase()) ? args[1].toLowerCase() : "low";
+
+    const apiUrl = `https://arychauhann.onrender.com/api/ihancer?url=${encodeURIComponent(originalUrl)}&type=${type}&level=${level}`;
+
+    message.reply("🔄 Processing your image with iHancer AI... Please wait.", async (err, info) => {
+      try {
+        const response = await axios.get(apiUrl, { responseType: "arraybuffer" });
+
+        const filePath = path.join(__dirname, `ihancer_${Date.now()}.png`);
+        fs.writeFileSync(filePath, Buffer.from(response.data));
+
+        await message.reply({
+          body: `✅ Here is your enhanced image (type=${type}, level=${level})`,
+          attachment: fs.createReadStream(filePath)
+        });
+
+        fs.unlinkSync(filePath);
+
+        message.unsend(info.messageID);
+      } catch (error) {
+        console.error("4k.onStart error:", error?.response?.data || error.message);
+        message.reply("❌ There was an error processing your image. Please try again later.");
+      }
+    });
   }
 };

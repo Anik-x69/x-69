@@ -2,193 +2,165 @@ const axios = require("axios");
 const { getPrefix } = global.utils;
 const { commands, aliases } = global.GoatBot;
 
-let xfont = null;
-let yfont = null;
-let categoryEmoji = null;
-
-async function loadResources() {
- try {
- const [catRes, cmdRes, emojiRes] = await Promise.all([
- axios.get("https://raw.githubusercontent.com/Saim-x69x/sakura/main/xfont.json"),
- axios.get("https://raw.githubusercontent.com/Saim-x69x/sakura/main/yfont.json"),
- axios.get("https://raw.githubusercontent.com/Saim-x69x/sakura/main/category.json")
- ]);
- xfont = catRes.data;
- yfont = cmdRes.data;
- categoryEmoji = emojiRes.data;
- } catch (err) {}
-}
-
-function fontConvert(text, type = "command") {
- const fontMap = type === "category" ? xfont : yfont;
- if (!fontMap) return text;
- return text.split("").map(ch => fontMap[ch] || ch).join("");
-}
-
-function getCategoryEmoji(cat) {
- return categoryEmoji?.[cat.toLowerCase()] || "🗂️";
-}
-
-function levenshteinDistance(a, b) {
- const matrix = Array(b.length + 1).fill(0).map(() => Array(a.length + 1).fill(0));
- for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
- for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
- for (let j = 1; j <= b.length; j++) {
- for (let i = 1; i <= a.length; i++) {
- const cost = a[i - 1] === b[j - 1] ? 0 : 1;
- matrix[j][i] = Math.min(
- matrix[j][i - 1] + 1,
- matrix[j - 1][i] + 1,
- matrix[j - 1][i - 1] + cost
- );
- }
- }
- return matrix[b.length][a.length];
-}
-
-function getClosestCommand(name) {
- const lower = name.toLowerCase();
- let best = null, dist = Infinity;
- for (const cmd of commands.keys()) {
- const d = levenshteinDistance(lower, cmd.toLowerCase());
- if (d < dist) {
- dist = d;
- best = cmd;
- }
- }
- return dist <= 3 ? best : null;
-}
-
-function roleTextToString(role) {
- switch (role) {
- case 0: return "All Users";
- case 1: return "Group Admins";
- case 2: return "VIP Users";
- case 3: return "Bot Admin";
- case 4: return "Bot Creator";
- default: return "Unknown";
- }
-}
+const mediaUrls = [
+  "", "", ""
+];
 
 module.exports = {
- config: {
- name: "help",
- aliases: "menu",
- version: "2.0",
- author: "Saimx69x",
- countDown: 5,
- role: 0,
- shortDescription: { en: "Shows all commands or details." },
- longDescription: { en: "Display categories, command lists or specific command info." },
- category: "info",
- guide: { en: "{pn}, {pn} [command], {pn} -c [category]" }
- },
+  config: {
+    name: "help",
+    aliases: ["use"],
+    version: "1.25",
+    author: "Ayanokōji",
+    countDown: 5,
+    role: 0,
+    shortDescription: { en: "Explore command usage 📖" },
+    longDescription: { en: "View detailed command usage, list commands by page, or filter by category ✨" },
+    category: "info",
+    guide: {
+      en: "🔹 {pn} [pageNumber]\n🔹 {pn} [commandName]\n🔹 {pn} -c <categoryName>"
+    },
+    priority: 1,
+  },
 
- onStart: async function ({ message, args, event, role }) {
- const prefix = getPrefix(event.threadID);
+  onStart: async function ({ message, args, event, threadsData }) {
+    try {
+      const { threadID } = event;
+      const prefix = getPrefix(threadID) || "!";
 
- if (!xfont || !yfont || !categoryEmoji) await loadResources();
+      const getAttachment = async () => {
+        try {
+          const randomUrl = mediaUrls[Math.floor(Math.random() * mediaUrls.length)];
+          if (!randomUrl) return null;
+          const response = await axios.get(randomUrl, { responseType: "stream" });
+          return response.data;
+        } catch (error) {
+          console.warn("Failed to fetch media:", error.message);
+          return null;
+        }
+      };
 
- const categories = {};
- for (const [name, cmd] of commands) {
- if (!cmd?.config || typeof cmd.onStart !== "function") continue;
- if (cmd.config.role > role) continue;
- const cat = (cmd.config.category || "UNCATEGORIZED").toUpperCase();
- if (!categories[cat]) categories[cat] = [];
- categories[cat].push(name);
- }
+      // PAGE VIEW
+      if (args.length === 0 || !isNaN(args[0])) {
+        const categories = {};
+        const commandList = [];
 
- const helpImage = "https://files.catbox.moe/4h41x5.jpg";
- const input = args.join(" ").trim();
+        for (const [name, value] of commands) {
+          const category = value.config.category?.toLowerCase() || "uncategorized";
+          if (!categories[category]) categories[category] = [];
+          categories[category].push(name);
+          commandList.push(name);
+        }
 
- if (args[0] === "-c" && args[1]) {
- const categoryName = args[1].toUpperCase();
- if (!categories[categoryName]) {
- return message.reply(`❌ Category "${categoryName}" not found.`);
- }
+        const totalCommands = commandList.length;
+        Object.keys(categories).forEach(cat => {
+          categories[cat].sort((a, b) => a.localeCompare(b));
+        });
 
- const emoji = getCategoryEmoji(categoryName);
- const list = categories[categoryName];
- const total = list.length;
+        const sortedCategories = Object.keys(categories).sort();
+        const page = parseInt(args[0]) || 1;
+        const itemsPerPage = 10;
+        const totalPages = Math.ceil(sortedCategories.length / itemsPerPage);
 
- let msg = "";
- msg += "━━━━━━━━━━━━━━\n";
- msg += `𝐂𝐀𝐓𝐄𝐆𝐎𝐑𝐘: ${emoji} | ${fontConvert(categoryName, "category")}\n`;
- msg += "╭──────୨ৎ──────╮\n";
+        if (page < 1 || page > totalPages)
+          return message.reply(`🚫 Invalid page! Please choose between 1 and ${totalPages}.`);
 
- for (const cmd of list.sort()) {
- msg += `╎ ᯓ✧. ${fontConvert(cmd, "command")}\n`;
- }
+        const start = (page - 1) * itemsPerPage;
+        const end = start + itemsPerPage;
+        const pagedCategories = sortedCategories.slice(start, end);
 
- msg += "┕━─────୨ৎ─────━ᥫ᭡\n";
- msg += "• 𝙽𝚎𝚎𝚍 𝚑𝚎𝚕𝚙 𝚠𝚒𝚝𝚑 𝚊 𝚌𝚘𝚖𝚖𝚊𝚗𝚍? 𝚄𝚜𝚎 /𝚑𝚎𝚕𝚙 <𝚌𝚘𝚖𝚖𝚊𝚗𝚍𝚗𝚊𝚖𝚎>.\n";
- msg += "╭──────୨ৎ──────╮\n";
- msg += `╎ 🔢 𝐓𝐨𝐭𝐚𝐥 𝐂𝐨𝐦𝐦𝐚𝐧𝐝𝐬: ${total}\n`;
- msg += `╎ ⚡️ 𝐏𝐫𝐞𝐟𝐢𝐱: ${prefix}\n`;
- msg += "╎ 👤 𝐂𝐫𝐞𝐚𝐭𝐨𝐫: 𝐒𝐚𝐢𝐦𝐱𝟔𝟗𝐱\n";
- msg += "╰──────୨ৎ──────╯";
+        let msg = `✨ [ Guide For Beginners - Page ${page} ] ✨\n\n`;
+        for (const category of pagedCategories) {
+          const cmds = categories[category];
+          const title = category.toUpperCase();
+          msg += `╭──── [ ${title} ]\n`;
+          msg += `│ ✧ ${cmds.join("✧ ")}\n`;
+          msg += `╰───────────────◊\n`;
+        }
 
- return message.reply({
- body: msg,
- attachment: await global.utils.getStreamFromURL(helpImage)
- });
- }
+        msg += `\n╭─『 ALYA BOT 』\n`;
+        msg += `╰‣ Total commands: ${totalCommands}\n`;
+        msg += `╰‣ Page ${page} of ${totalPages}\n`;
+        msg += `╰‣ A Personal Facebook Bot\n`;
+        msg += `╰‣ ADMIN: ツꫝ𝙻𝚙𝙷𝚊 𝚂ꫝ𝙳𝙸𝙺ᥫ᭡\n`;
+        msg += `╰‣ To see usage of a command, type: ${prefix}help [commandName]`;
 
- if (!input) {
- let msg = "";
- msg += "━━━━━━━━━━━━━━\n";
- msg += "𝙰𝚟𝚊𝚒𝚕𝚊𝚋𝚕𝚎 𝙲𝚘𝚖𝚖𝚊𝚗𝚍𝚜:\n";
- msg += "━━━━━━━━━━━━━━\n";
+        return message.reply({
+          body: msg,
+          attachment: await getAttachment()
+        });
+      }
 
- for (const cat of Object.keys(categories).sort()) {
- msg += `┍─━〔 ${getCategoryEmoji(cat)} | ${fontConvert(cat, "category")} 〕\n`;
- for (const cmd of categories[cat].sort()) {
- msg += `╎ᯓ✧. ${fontConvert(cmd, "command")}\n`;
- }
- msg += "┕━─────୨ৎ─────━ᥫ᭡\n";
- }
+      // CATEGORY FILTER -c <category>
+      if (args[0].toLowerCase() === "-c") {
+        if (!args[1]) return message.reply("🚫 Please specify a category!");
+        const categoryName = args[1].toLowerCase();
+        const filteredCommands = Array.from(commands.values()).filter(
+          (cmd) => (cmd.config.category?.toLowerCase() === categoryName)
+        );
 
- msg += "• 𝙽𝚎𝚎𝚍 𝚑𝚎𝚕𝚙 𝚠𝚒𝚝𝚑 𝚊 𝚌𝚘𝚖𝚖𝚊𝚗𝚍? 𝚄𝚜𝚎 /𝚑𝚎𝚕𝚙 <𝚌𝚘𝚖𝚖𝚊𝚗𝚍𝚗𝚊𝚖𝚎>.\n";
- msg += "╭──────୨ৎ──────╮\n";
- msg += `╎ 🔢 𝐓𝐨𝐭𝐚𝐥 𝐂𝐨𝐦𝐦𝐚𝐧𝐝𝐬: ${commands.size}\n`;
- msg += `╎ ⚡️ 𝐏𝐫𝐞𝐟𝐢𝐱: ${prefix}\n`;
- msg += "╎ 👤 𝐂𝐫𝐞𝐚𝐭𝐨𝐫: 𝐒𝐚𝐢𝐦𝐱𝟔𝟗𝐱\n";
- msg += "╰──────୨ৎ──────╯";
+        if (filteredCommands.length === 0)
+          return message.reply(`🚫 No commands found in "${categoryName}" category.`);
 
- return message.reply({
- body: msg,
- attachment: await global.utils.getStreamFromURL(helpImage)
- });
- }
+        const cmdNames = filteredCommands.map(cmd => cmd.config.name).sort((a, b) => a.localeCompare(b));
+        const title = categoryName.toUpperCase();
 
- const cmdName = input.toLowerCase();
- const cmd = commands.get(cmdName) || commands.get(aliases.get(cmdName));
+        let msg = `✨ [ ${title} Commands ] ✨\n\n`;
+        msg += `╭──── [ ${title} ]\n`;
+        msg += `│ ✧ ${cmdNames.join("✧ ")}\n`;
+        msg += `╰───────────────◊\n`;
+        msg += `\n╭─『 ALYA BOT 』\n`;
+        msg += `╰‣ Total commands in this category: ${cmdNames.length}\n`;
+        msg += `╰‣ A Personal Facebook Bot\n`;
+        msg += `╰‣ ADMIN: ツꫝ𝙻𝚙𝙷𝚊 𝚂ꫝ𝙳𝙸𝙺ᥫ᭡`;
 
- if (!cmd || !cmd.config) {
- const suggestion = getClosestCommand(cmdName);
- return message.reply(
- suggestion
- ? `❌ Command "${cmdName}" not found.\n👉 Maybe you meant: ${suggestion}`
- : `❌ Command "${cmdName}" not found.`
- );
- }
+        return message.reply({
+          body: msg,
+          attachment: await getAttachment()
+        });
+      }
 
- const c = cmd.config;
- const usage = c.guide?.en?.replace(/{pn}/g, `${prefix}${c.name}`) || "No usage.";
+      // INDIVIDUAL COMMAND
+      const commandName = args[0].toLowerCase();
+      const command = commands.get(commandName) || commands.get(aliases.get(commandName));
 
- const msg = `
-╭═══ [ 𝘊𝘖𝘔𝘔𝘈𝘕𝘋 𝘐𝘕𝘍𝘖 ] ═══╮
-╎🧩 Name : ${c.name}
-╎📦 Category : ${(c.category || "UNCATEGORIZED").toUpperCase()}
-╎📜 Description: ${c.longDescription?.en || "No description."}
-╎🔁 Aliases : ${c.aliases ? c.aliases.join(", ") : "None"}
-╎⚙️ Version : ${c.version || "1.0"}
-╎🔐 Permission : ${c.role} (${roleTextToString(c.role)})
-╎⏱️ Cooldown : ${c.countDown || 5}s
-╎👑 Author : ${c.author || "Unknown"}
-╎📖 Usage : ${usage}
-╰═════════୨ৎ═════════╯`;
+      if (!command)
+        return message.reply(`🚫 Command "${commandName}" not found.`);
 
- return message.reply(msg);
- }
+      const configCommand = command.config;
+      const author = configCommand.author || "Unknown";
+      const longDescription = configCommand.longDescription?.en || "No description";
+      const guideBody = configCommand.guide?.en || "No guide available.";
+      const usage = guideBody.replace(/{pn}/g, prefix).replace(/{n}/g, configCommand.name);
+
+      let msg = `✨ [ Command: ${configCommand.name.toUpperCase()} ] ✨\n\n`;
+      msg += `╭─── 📜 Details ───\n` +
+        `│ 🔹 Name: ${configCommand.name}\n` +
+        `│ 📝 Description: ${longDescription}\n` +
+        `│ 🌐 Aliases: ${configCommand.aliases ? configCommand.aliases.join(", ") : "None"}\n` +
+        `│ 🛠 Version: ${configCommand.version || "1.0"}\n` +
+        `│ ⏳ Cooldown: ${configCommand.countDown || 1}s\n` +
+        `│ ✍ Author: ${author}\n` +
+        `╰───────────────◊\n` +
+        `╭─── 📚 Usage ───\n` +
+        `│ ${usage}\n` +
+        `╰───────────────◊\n` +
+        `╭─── 📌 Notes ───\n` +
+        `│ Customize as needed with ♡ ALYA bot ♡\n` +
+        `╰───────────────◊\n` +
+        `╭─『 ALYA BOT 』\n` +
+        `╰‣ Total commands: ${commands.size}\n` +
+        `╰‣ A Personal Facebook Bot\n` +
+        `╰‣ ADMIN: ツꫝ𝙻𝚙𝙷𝚊 𝚂ꫝ𝙳𝙸𝙺ᥫ᭡`;
+
+      return message.reply({
+        body: msg,
+        attachment: await getAttachment()
+      });
+
+    } catch (error) {
+      console.error("Help command error:", error);
+      await message.reply("⚠ An error occurred. Please try again later.");
+    }
+  },
 };

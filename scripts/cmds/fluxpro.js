@@ -1,65 +1,50 @@
 const axios = require("axios");
-const fs = require("fs-extra");
-const path = require("path");
+const baseApiUrl = async () => {
+  const base = await axios.get(
+    `https://raw.githubusercontent.com/Blankid018/D1PT0/main/baseApiUrl.json`,
+  );
+  return base.data.api;
+};
 
-module.exports = {
-  config: {
-    name: "fluxpro",
-    version: "1.0",
-    author: "Saimx69x (API by Renz)",
-    countDown: 5,
-    role: 0,
-    description: {
-      en: "Generate an AI image using the Oculux Flux 1.1 Pro API",
-      vi: "Tạo ảnh AI bằng Oculux Flux 1.1 Pro API",
-    },
-    category: "image generator",
-    guide: {
-      en: "{pn} <prompt>\nExample: {prefix}fluxpro cyberpunk samurai in rain",
-      vi: "{pn} <prompt>\nVí dụ: {prefix}fluxpro cyberpunk samurai in rain",
-    },
-  },
+module.exports.config = {
+  name: "fluxpro",
+  version: "2.0",
+  role: 2,
+  author: "Dipto",
+  description: "Generate images with Flux.1 Pro",
+  category: "𝗜𝗠𝗔𝗚𝗘 𝗚𝗘𝗡𝗘𝗥𝗔𝗧𝗢𝗥",
+  preimum: true,
+  guide: "{pn} [prompt] --ratio 1024x1024\n{pn} [prompt]",
+  countDown: 15,
+};
 
-  onStart: async function ({ message, event, args, api, commandName }) {
-    const prefix =
-      global.utils?.getPrefix?.(event.threadID) ||
-      global.GoatBot?.config?.prefix ||
-      "/";
+module.exports.onStart = async ({ message, event, args, api }) => {
+  try {
+  const prompt = args.join(" ");
+  /*let prompt2, ratio;
+  if (prompt.includes("--ratio")) {
+    const parts = prompt.split("--ratio");
+    prompt2 = parts[0].trim();
+    ratio = parts[1].trim();
+  } else {
+    prompt2 = prompt;
+    ratio = "1024x1024";
+  }*/
+    const startTime = new Date().getTime();
+    const ok = message.reply('wait baby <🦆')
+    api.setMessageReaction("🆙", event.messageID, (err) => {}, true);
+    const apiUrl = `${await baseApiUrl()}/flux11?prompt=${prompt}`;
 
-    const prompt = args.join(" ");
-    if (!prompt) {
-      return message.reply(
-        `⚠️ Please provide a prompt.\nExample: ${prefix}${commandName} futuristic dragon flying in space`
-      );
-    }
-
-    api.setMessageReaction("🎨", event.messageID, () => {}, true);
-    const waitingMsg = await message.reply(
-      "🎨 Generating your image... Please wait..."
-    );
-
-    const encodedPrompt = encodeURIComponent(prompt);
-    const url = `https://dev.oculux.xyz/api/flux-1.1-pro?prompt=${encodedPrompt}`;
-    const imgPath = path.join(__dirname, "cache", `fluxpro_${event.senderID}.png`);
-
-    try {
-      const response = await axios.get(url, { responseType: "arraybuffer" });
-      fs.writeFileSync(imgPath, response.data);
-
-      await message.reply(
-        {
-          body: `✅ Here is your FluxPro AI image.\n🖋️ Prompt: ${prompt}`,
-          attachment: fs.createReadStream(imgPath),
-        },
-        () => {
-          fs.unlinkSync(imgPath);
-          if (waitingMsg?.messageID) api.unsendMessage(waitingMsg.messageID);
-        }
-      );
-    } catch (error) {
-      console.error("FluxPro generation error:", error);
-      message.reply("⚠️ Failed to generate FluxPro image. Please try again later.");
-      if (waitingMsg?.messageID) api.unsendMessage(waitingMsg.messageID);
-    }
-  },
+    api.setMessageReaction("🗿", event.messageID, (err) => {}, true);
+     message.unsend(ok.messageID)
+    const attachment = await global.utils.getStreamFromURL(apiUrl);
+    const endTime = new Date().getTime();
+    await message.reply({
+          body: `Here's your image\nModel Name: "Flux.1 Pro"\nTime Taken: ${(endTime - startTime) / 1000} second/s`, 
+          attachment
+      });
+  } catch (e) {
+    console.log(e);
+    message.reply("Error: " + e.message);
+  }
 };

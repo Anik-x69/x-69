@@ -7,7 +7,7 @@ module.exports = {
 		version: "1.2",
 		author: "NTKhang",
 		countDown: 5,
-		role: 3,
+		role: 2,
 		description: {
 			vi: "Lấy fbstate hiện tại",
 			en: "Get current fbstate"

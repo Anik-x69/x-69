@@ -1,45 +1,35 @@
 const axios = require("axios");
-const fs = require("fs");
+const https = require("https");
+const fs = require("fs-extra");
 const path = require("path");
 
 module.exports = {
-  config: {
-    name: "dog",
-    author: "Saimx69x",
-    category: "image",
-    version: "1.0",
-    role: 0,
-    shortDescription: { en: "🐶 Send a random dog image" },
-    longDescription: { en: "Fetches a random dog image." },
-    guide: { en: "{p}{n} — Shows a random dog image" }
-  },
+ config: {
+ name: "dog",
+ version: "1.0",
+ author: "Chitron Bhattacharjee",
+ countDown: 5,
+ role: 0,
+ shortDescription: { en: "random dog image" },
+ longDescription: { en: "Sends a random dog image" },
+ category: "fun",
+ guide: { en: "+dog" }
+ },
 
-  onStart: async function({ api, event }) {
-    try {
-      const apiUrl = "https://xsaim8x-xxx-api.onrender.com/api/dog"; // তোমার API
+ onStart: async function ({ message }) {
+ const res = await axios.get("https://dog.ceo/api/breeds/image/random");
+ const url = res.data.message;
+ const cachePath = path.join(__dirname, "cache/dog.jpg");
 
-      const response = await axios.get(apiUrl, { responseType: "arraybuffer" });
-      const buffer = Buffer.from(response.data, "binary");
-
-      const tempPath = path.join(__dirname, "dog_temp.jpg");
-      fs.writeFileSync(tempPath, buffer);
-
-      await api.sendMessage(
-        {
-          body: "🐶 Here's a random dog for you!",
-          attachment: fs.createReadStream(tempPath)
-        },
-        event.threadID,
-        () => {
-          
-          fs.unlinkSync(tempPath);
-        },
-        event.messageID
-      );
-
-    } catch (err) {
-      console.error(err);
-      api.sendMessage("❌ Failed to fetch dog image.\n" + err.message, event.threadID, event.messageID);
-    }
-  }
+ const file = fs.createWriteStream(cachePath);
+ https.get(url, (response) => {
+ response.pipe(file);
+ file.on("finish", () => {
+ message.reply({
+ body: "🐶 Here's a cute doggo!",
+ attachment: fs.createReadStream(cachePath)
+ });
+ });
+ });
+ }
 };

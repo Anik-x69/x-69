@@ -7,9 +7,9 @@ module.exports = {
     version: "0.0.2",
     author: "ArYAN",
     countDown: 5,
-    role: 2,
+    role: 0,
     description: "Upload videos to Google Drive easily!",
-    category: "utility",
+    category: "Utility",
     guide: "Use: {pn} <link> to upload a video from a link\nOr reply to a video/message with media to upload"
   },
 

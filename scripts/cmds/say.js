@@ -1,55 +1,52 @@
-const fs = require("fs");
 const axios = require("axios");
-const googleTTS = require("google-tts-api");
+
+const baseApiUrl = async () => {
+  const base = await axios.get("https://raw.githubusercontent.com/mahmudx7/exe/main/baseApiUrl.json");
+  return base.data.mahmud
+};
 
 module.exports = {
   config: {
     name: "say",
-    aliases: ["speak"],
-    version: "1.0",
-    author: "Saimx69x",
+    version: "1.7",
+    author: "MahMUD",
     countDown: 5,
     role: 0,
-    usePrefix: true,
-    shortDescription: {
-      en: "Convert text to Bangla voice"
-    },
-    longDescription: {
-      en: "Bot will speak your text in Bangla using Google TTS"
-    },
     category: "media",
-    guide: {
-      en: "{pn} <your Bangla text> → e.g. {pn} আমি ভালো আছি"
-    }
+    guide: "{pn} <text> (or reply to a message)",
   },
 
-  onStart: async function ({ args, message }) {
-    const text = args.join(" ").trim();
-    if (!text) return message.reply("⚠️ Please provide some Bangla text to speak!");
+  onStart: async function ({ api, message, args, event }) {
+    let text = args.join(" ");
+
+    if (event.type === "message_reply" && event.messageReply.body) {
+      text = event.messageReply.body;
+    }
+
+    if (!text) {
+      return message.reply("⚠️ দয়া করে কিছু লিখুন বা একটি মেসেজে রিপ্লাই দিন!");
+    }
 
     try {
-  
-      const url = googleTTS.getAudioUrl(text, {
-        lang: 'bn',
-        slow: false,
-        host: 'https://translate.google.com'
+      const baseUrl = await baseApiUrl();
+      const response = await axios.get(`${baseUrl}/api/say`, {
+        params: { text },
+        headers: { "Author": module.exports.config.author },
+        responseType: "stream",
       });
 
-  
-      const tempPath = `${__dirname}/voice.mp3`;
-      const res = await axios.get(url, { responseType: 'arraybuffer' });
-      fs.writeFileSync(tempPath, Buffer.from(res.data));
+      if (response.data.error) {
+        return message.reply(`❌ Error: ${response.data.error}`);
+      }
 
-      await message.reply({
-        body: `🔊 Voice Output: ${text}`,
-        attachment: fs.createReadStream(tempPath)
+      message.reply({
+        body: "",
+        attachment: response.data,
       });
 
-      fs.unlinkSync(tempPath);
-
-    } catch (err) {
-      console.error("❌ Say command error:", err);
-      message.reply("❌ Failed to generate voice!");
+    } catch (e) {
+      console.error("API Error:", e.response ? e.response.data : e.message);
+      message.reply("🐥 দুঃখিত, কিছু একটা সমস্যা হয়েছে!\n\nfix Author name\n" + (e.response?.data?.error || e.message));
     }
-  }
+  },
 };

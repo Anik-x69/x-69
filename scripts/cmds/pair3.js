@@ -1,133 +1,55 @@
-const axios = require("axios");
-const { createCanvas, loadImage } = require("canvas");
-const fs = require("fs");
-const path = require("path");
-
-const baseUrl = "https://raw.githubusercontent.com/Saim12678/Saim69/1a8068d7d28396dbecff28f422cb8bc9bf62d85f/font";
+const axios = require ("axios");
+const fs = require ("fs-extra");
 
 module.exports = {
   config: {
     name: "pair3",
-    author: "Saimx69x",
-    category: "love",
+    aliases: [],
     version: "1.0",
+    author: "nexo_here",
+    countDown: 5,
     role: 0,
-    shortDescription: {
-      en: "💘 Generate a love match between you and another group member"
-    },
-    longDescription: {
-      en: "This command calculates a love match between you and a suitable member of the current group based on gender. Shows circular avatars, background, and love percentage."
-    },
-    guide: {
-      en: "{p}{n} — Use this command in a group to find a love match"
-    }
+    shortDescription: " ",
+    longDescription: "",
+    category: "fun",
+    guide: "{pn}"
   },
 
-  onStart: async function ({ api, event, usersData }) {
-    try {
-      const senderData = await usersData.get(event.senderID);
-      let senderName = senderData.name;
+  onStart: async function({ api, event, threadsData, usersData }) {
 
-      const threadData = await api.getThreadInfo(event.threadID);
-      const users = threadData.userInfo;
+    const { threadID, messageID, senderID } = event;
+    const { participantIDs } = await api.getThreadInfo(threadID);
+    var tle = Math.floor(Math.random() * 101);
+    var namee = (await usersData.get(senderID)).name
+    const botID = api.getCurrentUserID();
+    const listUserID = participantIDs.filter(ID => ID != botID && ID != senderID);
+    var id = listUserID[Math.floor(Math.random() * listUserID.length)];
+    var name = (await usersData.get(id)).name
+    var arraytag = [];
+    arraytag.push({ id: senderID, tag: namee });
+    arraytag.push({ id: id, tag: name });
 
-      const myData = users.find(user => user.id === event.senderID);
-      if (!myData || !myData.gender) {
-        return api.sendMessage("⚠️ Could not determine your gender.", event.threadID, event.messageID);
-      }
+    let Avatar = (await axios.get(`https://graph.facebook.com/${senderID}/picture?width=512&height=512&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`, { responseType: "arraybuffer" })).data;
+    fs.writeFileSync(__dirname + "/cache/avt.png", Buffer.from(Avatar, "utf-8"));
 
-      const myGender = myData.gender.toUpperCase();
-      let matchCandidates = [];
+    let gifLove = (await axios.get(`https://i.ibb.co/y4dWfQq/image.gif`, { responseType: "arraybuffer" })).data;
+    fs.writeFileSync(__dirname + "/cache/giflove.png", Buffer.from(gifLove, "utf-8"));
 
-      if (myGender === "MALE") {
-        matchCandidates = users.filter(user => user.gender === "FEMALE" && user.id !== event.senderID);
-      } else if (myGender === "FEMALE") {
-        matchCandidates = users.filter(user => user.gender === "MALE" && user.id !== event.senderID);
-      } else {
-        return api.sendMessage("⚠️ Your gender is undefined. Cannot find a match.", event.threadID, event.messageID);
-      }
+    let Avatar2 = (await axios.get(`https://graph.facebook.com/${id}/picture?width=512&height=512&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`, { responseType: "arraybuffer" })).data;
+    fs.writeFileSync(__dirname + "/cache/avt2.png", Buffer.from(Avatar2, "utf-8"));
 
-      if (matchCandidates.length === 0) {
-        return api.sendMessage("❌ No suitable match found in the group.", event.threadID, event.messageID);
-      }
+    var imglove = [];
 
-      const selectedMatch = matchCandidates[Math.floor(Math.random() * matchCandidates.length)];
-      let matchName = selectedMatch.name;
+    imglove.push(fs.createReadStream(__dirname + "/cache/avt.png"));
+    imglove.push(fs.createReadStream(__dirname + "/cache/giflove.png"));
+    imglove.push(fs.createReadStream(__dirname + "/cache/avt2.png"));
 
-      let fontMap;
-      try {
-        const { data } = await axios.get(`${baseUrl}/21.json`);
-        fontMap = data;
-      } catch (e) {
-        console.error("Font load error:", e.message);
-        fontMap = {};
-      }
+    var msg = {
+      body: `🥰Successful pairing!\n💌Wish you two hundred years of happiness\n💕Double ratio: ${tle}%\n${namee} 💓 ${name}`,
+      mentions: arraytag,
+      attachment: imglove
+    };
 
-      const convertFont = (text) =>
-        text.split("").map(ch => fontMap[ch] || ch).join("");
-
-      senderName = convertFont(senderName);
-      matchName = convertFont(matchName);
-
-      const width = 735, height = 411;
-      const canvas = createCanvas(width, height);
-      const ctx = canvas.getContext("2d");
-
-      const background = await loadImage("https://files.catbox.moe/g6lr9y.jpg");
-      ctx.drawImage(background, 0, 0, width, height);
-
-      const sIdImage = await loadImage(
-        `https://graph.facebook.com/${event.senderID}/picture?width=720&height=720&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`
-      );
-      const pairPersonImage = await loadImage(
-        `https://graph.facebook.com/${selectedMatch.id}/picture?width=720&height=720&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`
-      );
-
-      const avatarPositions = {
-        sender: { x: 131, y: 128, size: 154 },
-        partner: { x: width - 302, y: 128, size: 154 },
-      };
-
-      function drawCircle(ctx, img, x, y, size) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
-        ctx.closePath();
-        ctx.clip();
-        ctx.drawImage(img, x, y, size, size);
-        ctx.restore();
-      }
-
-      drawCircle(ctx, sIdImage, avatarPositions.sender.x, avatarPositions.sender.y, avatarPositions.sender.size);
-      drawCircle(ctx, pairPersonImage, avatarPositions.partner.x, avatarPositions.partner.y, avatarPositions.partner.size);
-
-      const outputPath = path.join(__dirname, "pair_output.png");
-      const out = fs.createWriteStream(outputPath);
-      const stream = canvas.createPNGStream();
-      stream.pipe(out);
-
-      out.on("finish", () => {
-        const lovePercent = Math.floor(Math.random() * 31) + 70;
-
-        const message = `💞 𝗠𝗮𝘁𝗰𝗵𝗺𝗮𝗸𝗶𝗻𝗴 𝗖𝗼𝗺𝗽𝗹𝗲𝘁𝗲 💞
-
-🎀  ${senderName} ✨️
-🎀  ${matchName} ✨️
-
-🕊️ 𝓓𝓮𝓼𝓽𝓲𝓷𝔂 𝓱𝓪𝓼 𝔀𝓻𝓲𝓽𝓽𝓮𝓷 𝔂𝓸𝓾𝓻 𝓷𝓪𝓶𝓮𝓼 𝓽𝓸𝓰𝓮𝓽𝓱𝓮𝓻  🌹 𝓜𝓪𝔂 𝔂𝓸𝓾𝓻 𝓫𝓸𝓷𝓭 𝓵𝓪𝓼𝓽 𝓯𝓸𝓻𝓮𝓿𝓮𝓻  ✨️  
-
-💘 𝙲𝚘𝚖𝚙𝚊𝚝𝚒𝚋𝚒𝚕𝚒𝚝𝚢: ${lovePercent}% 💘`;
-
-        api.sendMessage(
-          { body: message, attachment: fs.createReadStream(outputPath) },
-          event.threadID,
-          () => fs.unlinkSync(outputPath),
-          event.messageID
-        );
-      });
-
-    } catch (error) {
-      api.sendMessage("❌ An error occurred: " + error.message, event.threadID, event.messageID);
-    }
-  },
+    return api.sendMessage(msg, event.threadID, event.messageID);
+  }
 };

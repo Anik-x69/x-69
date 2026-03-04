@@ -1,119 +1,199 @@
-const a = require("axios");
-const b = require("fs");
-const c = require("path");
-const d = require("yt-search");
-
-const nix = "https://raw.githubusercontent.com/aryannix/stuffs/master/raw/apis.json";
-
-async function getStream(url) {
-  const res = await a({ url, responseType: "stream" });
-  return res.data;
-}
-
-async function downloadSong(baseApi, url, api, event, title = null) {
-  try {
-    const apiUrl = `${baseApi}/play?url=${encodeURIComponent(url)}`;
-    const res = await a.get(apiUrl);
-    const data = res.data;
-
-    if (!data.status || !data.downloadUrl) throw new Error("API failed to return download URL.");
-
-    const songTitle = title || data.title;
-    const fileName = `${songTitle}.mp3`.replace(/[\\/:"*?<>|]/g, "");
-    const filePath = c.join(__dirname, fileName);
-
-    const songData = await a.get(data.downloadUrl, { responseType: "arraybuffer" });
-    b.writeFileSync(filePath, songData.data);
-
-    await api.sendMessage(
-      { body: `• ${songTitle}`, attachment: b.createReadStream(filePath) },
-      event.threadID,
-      () => b.unlinkSync(filePath),
-      event.messageID
-    );
-  } catch (err) {
-    console.error(err);
-    api.sendMessage(`❌ Failed to download song: ${err.message}`, event.threadID, event.messageID);
-  }
-}
+const axios = require("axios");
+const yts = require("yt-search");
+const fs = require("fs-extra");
+const path = require("path");
 
 module.exports = {
   config: {
-    name: "song",
-    aliases: ["music", "sing"],
-    version: "0.0.1",
-    author: "ArYAN",
+    name: "sing",
+    aliases: ["song", "music"],
+    version: "2.3",
+    author: "Mueid Mursalin Rifat",
     countDown: 5,
     role: 0,
-    shortDescription: "Sing tomake chai",
-    longDescription: "Search and download music from YouTube",
-    category: "MUSIC",
-    guide: "/play <song name or YouTube URL>"
+    shortDescription: "Download music from YouTube",
+    longDescription: "Search and download audio from YouTube using multiple APIs",
+    category: "media",
+    guide: {
+      en: "{pn} <song name>\nReply with 1-5 to download"
+    }
   },
 
-  onStart: async function ({ api: e, event: f, args: g, commandName: cmd }) {
-    let baseApi;
-    try {
-      const configRes = await a.get(nix);
-      baseApi = configRes.data && configRes.data.api;
-      if (!baseApi) throw new Error("Configuration Error: Missing API in GitHub JSON.");
-    } catch (error) {
-      return e.sendMessage("❌ Failed to fetch API configuration from GitHub.", f.threadID, f.messageID);
-    }
-    
-    if (!g.length) return e.sendMessage("❌ Provide a song name or YouTube URL.", f.threadID, f.messageID);
-
-    const aryan = g;
-    const query = aryan.join(" ");
-    if (query.startsWith("http")) return downloadSong(baseApi, query, e, f);
+  onStart: async function ({ message, event, args, api }) {
+    const query = args.join(" ");
+    if (!query) return message.reply("Please enter a song name");
 
     try {
-      const res = await d(query);
-      const results = res.videos.slice(0, 6);
-      if (!results.length) return e.sendMessage("❌ No results found.", f.threadID, f.messageID);
+      const res = await yts(query);
+      const videos = res.videos.slice(0, 5);
+      if (videos.length === 0) return message.reply("No songs found");
 
-      let msg = "";
-      results.forEach((v, i) => {
-        msg += `${i + 1}. ${v.title}\n⏱ ${v.timestamp} | 👀 ${v.views}\n\n`;
+      let body = `🎵 Search Results: "${query}"\nReply with 1-5 to download\n\n`;
+      for (let i = 0; i < videos.length; i++) {
+        body += `${i + 1}. ${videos[i].title}\nDuration: ${videos[i].timestamp} | By: ${videos[i].author.name}\n\n`;
+      }
+
+      const attachments = [];
+      for (let i = 0; i < videos.length; i++) {
+        try {
+          const img = await axios.get(videos[i].thumbnail, { responseType: "stream" });
+          const tempPath = path.join(__dirname, "cache", `thumb-${i}-${Date.now()}.jpg`);
+          const writer = fs.createWriteStream(tempPath);
+          img.data.pipe(writer);
+          await new Promise(resolve => writer.on("finish", resolve));
+          attachments.push(fs.createReadStream(tempPath));
+        } catch (e) {
+          console.error("Error downloading thumbnail:", e);
+        }
+      }
+
+      api.sendMessage({
+        body: body,
+        attachment: attachments
+      }, event.threadID, (err, info) => {
+        // Clean up temp files after sending
+        attachments.forEach(file => {
+          try { 
+            fs.unlinkSync(file.path); 
+          } catch (e) {}
+        });
+
+        if (err) return;
+
+        const sentMsgID = info.messageID;
+        
+        // Auto delete search result after 30 seconds
+        setTimeout(() => {
+          try {
+            api.unsendMessage(sentMsgID);
+          } catch (e) {}
+        }, 30000);
+
+        global.GoatBot.onReply.set(sentMsgID, {
+          commandName: "sing",
+          messageID: sentMsgID,
+          author: event.senderID,
+          data: videos
+        });
       });
 
-      const thumbs = await Promise.all(results.map(v => getStream(v.thumbnail)));
-
-      e.sendMessage(
-        { body: msg + "Reply with number (1-6) to download song", attachment: thumbs },
-        f.threadID,
-        (err, info) => {
-          if (err) return console.error(err);
-          global.GoatBot.onReply.set(info.messageID, {
-            results,
-            messageID: info.messageID,
-            author: f.senderID,
-            commandName: cmd,
-            baseApi
-          });
-        },
-        f.messageID
-      );
-    } catch (err) {
-      console.error(err);
-      e.sendMessage("❌ Failed to search YouTube.", f.threadID, f.messageID);
+    } catch (e) {
+      console.error("Search error:", e);
+      message.reply("Failed to search songs");
     }
   },
 
-  onReply: async function ({ api: e, event: f, Reply: g }) {
-    const results = g.results;
-    const baseApi = g.baseApi;
-    if (!baseApi) return e.sendMessage("❌ Session expired. Please restart the command.", f.threadID, f.messageID);
+  onReply: async function ({ event, message, Reply, api }) {
+    const { author, data, messageID } = Reply;
+    if (event.senderID !== author) return;
 
-    const choice = parseInt(f.body);
+    const index = parseInt(event.body);
+    if (isNaN(index) || index < 1 || index > data.length)
+      return message.reply("Please reply with a number from 1 to 5");
 
-    if (isNaN(choice) || choice < 1 || choice > results.length) {
-      return e.sendMessage("❌ Invalid selection.", f.threadID, f.messageID);
-    }
+    const selected = data[index - 1];
 
-    const selected = results[choice - 1];
-    await e.unsendMessage(g.messageID);
+    // Remove search message
+    try {
+      api.unsendMessage(messageID);
+    } catch (e) {}
 
-    downloadSong(baseApi, selected.url, e, f, selected.title);
+    const wait = await message.reply("⏳ Downloading your song...");
+    await handleDownload(selected.url, message, wait.messageID);
   }
 };
+
+// Download Handler with multiple API fallback
+async function handleDownload(url, message, waitMsgID) {
+  try {
+    // First try the ShadowX API
+    const shadowxApiURL = `https://shadowx-api.onrender.com/api/yt?url=${encodeURIComponent(url)}&quality=128&format=mp3`;
+    
+    try {
+      const { data: shadowxData } = await axios.get(shadowxApiURL, { timeout: 15000 });
+      
+      if (shadowxData.success && shadowxData.download_info && shadowxData.download_info.fileUrl) {
+        await downloadAndSend(
+          shadowxData.download_info.fileUrl,
+          shadowxData.video_info,
+          message,
+          waitMsgID,
+          "ShadowX-API"
+        );
+        return;
+      }
+    } catch (shadowxError) {
+      console.log("ShadowX API failed, trying backup API...");
+    }
+
+    // Fallback to original API
+    const backupApiURL = `https://koja-api.web-server.xyz/ytmp3?url=${encodeURIComponent(url)}`;
+    const { data: backupData } = await axios.get(backupApiURL);
+    
+    if (backupData.success && backupData.download && backupData.download.url) {
+      await downloadAndSend(
+        backupData.download.url,
+        backupData.metadata,
+        message,
+        waitMsgID,
+        "Koja-API"
+      );
+    } else {
+      throw new Error("Both APIs failed");
+    }
+
+  } catch (err) {
+    console.error("Download failed:", err);
+    try {
+      await message.unsend(waitMsgID);
+    } catch (e) {}
+    message.reply("❌ Error downloading song. Please try again later.");
+  }
+}
+
+// Helper function to download and send audio
+async function downloadAndSend(downloadUrl, metadata, message, waitMsgID, apiSource) {
+  try {
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`;
+    const filePath = path.join(__dirname, "cache", fileName);
+
+    const res = await axios.get(downloadUrl, { 
+      responseType: "stream",
+      timeout: 60000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+    
+    const writer = fs.createWriteStream(filePath);
+    res.data.pipe(writer);
+    
+    await new Promise((resolve, reject) => {
+      writer.on("finish", resolve);
+      writer.on("error", reject);
+      res.data.on("error", reject);
+    });
+
+    // Remove "Downloading..." message
+    try {
+      await message.unsend(waitMsgID);
+    } catch (e) {}
+
+    // Format metadata based on API source
+    let title = metadata.title || "Unknown Title";
+    let artist = metadata.author?.name || metadata.channel || "Unknown Artist";
+    let duration = metadata.duration?.timestamp || metadata.duration || "Unknown";
+
+    await message.reply({
+      body: `🎵 ${title}\n🎤 Artist: ${artist}\n⏱ Duration: ${duration}\n🔧 API: ${apiSource}\n\nDownloaded successfully!`,
+      attachment: fs.createReadStream(filePath)
+    });
+
+    // Clean up
+    fs.unlinkSync(filePath);
+
+  } catch (downloadErr) {
+    console.error(`Download error from ${apiSource}:`, downloadErr);
+    throw downloadErr;
+  }
+}

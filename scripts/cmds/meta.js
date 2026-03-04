@@ -1,42 +1,39 @@
 const axios = require('axios');
+const fs = require('fs-extra');
+const baseApiUrl = async () => {
+ const base = await axios.get(`https://raw.githubusercontent.com/ARYAN-AROHI-STORE/A4YA9-A40H1/refs/heads/main/APIRUL.json`);
+ return base.data.api;
+}; 
 
-module.exports.config = {
-  name: "meta",
-  version: "0.0.1",
-  role: 0,
-  author: "ArYAN",
-  description: "Meta AI",
-  category: "ai",
-  cooldowns: 2,
-  hasPrefix: false,
-};
-
-const API_SERVER_URL = 'https://aryan-meta-ai.vercel.app/meta-ai?prompt=';
-
-module.exports.onStart = async function({ api, event, args }) {
-  const { threadID, messageID } = event;
-  const question = args.join(' ').trim();
-
-  if (!question) {
-    return api.sendMessage("⚠️ Please provide your question.", threadID, messageID);
-  }
-
-  try {
-    const response = await axios.get(`${API_SERVER_URL}${encodeURIComponent(question)}`);
-
-    if (response.data.error) {
-      return api.sendMessage(`❌ Error: ${response.data.error}`, threadID, messageID);
-    }
-
-    const geminiAnswer = response.data.response;
-
-    if (geminiAnswer) {
-      return api.sendMessage(geminiAnswer, threadID, messageID);
-    } else {
-      return api.sendMessage("[⚜️]➜ Something went wrong. Please try again.", threadID, messageID);
-    }
-  } catch (error) {
-    console.error('Meta API Error:', error.response ? error.response.data : error.message);
-    return api.sendMessage("[⚜️]➜ Failed to get a response from Meta AI.", threadID, messageID);
-  }
+module.exports = {
+config:{
+ name: "meta",
+ aliases: ["img5"],
+ version: "6.9.0",
+ author: "Chitron Bhattacharjee",
+ countDown: 15,
+ role: 0,
+ shortDescription: "photo genarate",
+ longDescription: "Photo genarate from meta ai",
+ category: "imagination",
+ guide: {
+ en: "{pn} [prompt]"
+ }
+},
+onStart:async function ({ args, event, api }) {
+ try {
+ const prompt = args.join(" ");
+ const wait = await api.sendMessage("𝗪𝗮𝗶𝘁 𝗸𝗼𝗿𝗼 𝗕𝗮𝗯𝘆 <😘", event.threadID);
+ const response = await axios.get(`${await baseApiUrl()}/meta?prompt=${encodeURIComponent(prompt)}&key=dipto008`);
+ const data = response.data.imgUrls;
+ await api.unsendMessage(wait.messageID);
+ await api.sendMessage({
+ body: `✅ | Generated your images`,
+ attachment: await global.utils.getStreamFromURL(data)
+ }, event.threadID ,event.messageID);
+ } catch (e) {
+ console.error(e);
+ await api.sendMessage(`Failed to genarate photo!!!!\rror: ${e.message}`, event.threadID);
+ }
+ }
 };

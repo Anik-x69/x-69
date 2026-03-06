@@ -1,5 +1,3 @@
-📄 | Source code of "chipay.js":
-
 const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
@@ -31,7 +29,7 @@ module.exports = {
       targetID = messageReply.senderID;
     } else {
       // User not mentioned warning (Bangla)
-      return api.sendMessage("🤦‍♂️ | আরে ভাই, কাকে চিপায় নিবেন তারে তো মেনশন দেন নাই!", threadID, messageID);
+      return api.sendMessage("🤦‍♂️ | আরে ভাই_কাকে চিপায় নিবেন তারে তো মেনশন দেন নাই!", threadID, messageID);
     }
 
     const imgPath = path.join(cacheDir, `chipay_${Date.now()}.png`);
@@ -41,7 +39,7 @@ module.exports = {
       const targetName = userInfo[targetID]?.name || "User";
 
       // Preparation Message (Bangla)
-      api.sendMessage("⏳ | একটু দাঁড়ান, চিপায় ঝালমুড়ি খাওয়ার ব্যাবস্থা করতেছি... 😋", threadID, messageID);
+      api.sendMessage("⏳ | একটু দাঁড়ান_চিপায় ঝালমুড়ি খাওয়ার ব্যাবস্থা করতেছি...🤭", threadID, messageID);
 
       const backgroundUrl = "https://i.imgur.com/PlmZXfJ.jpeg";
       const accessToken = "6628568379|c1e620fa708a1d5696fb991c1bde5662"; 
@@ -114,7 +112,7 @@ module.exports = {
       fs.writeFileSync(imgPath, buffer);
 
       // Final Output Caption (Bangla Style)
-      const caption = `😾⎯͢⎯⃝⋆⃝চিঁপাঁয়ঁ আঁয়ঁ ঝাঁলঁমুঁড়িঁ বাঁনাঁয়ঁছিঁ🙈 ⋆⃝⋆⃝😹😋⋆🐰🍒\n\n${targetName} এ্ঁদি্ঁকে্ঁ আ্ঁসো্ঁ 💋💋`;
+      const caption = `😾⎯͢⎯⃝⋆⃝চিঁপাঁয়ঁ আঁয়ঁ ঝাঁলঁমুঁড়িঁ বাঁনাঁয়ঁছিঁ 🙈 ⋆⃝⋆⃝😹😋⋆🐰🍒\n\n${targetName} এ্ঁদি্ঁকে্ঁ আ্ঁসো্ঁ 💋💋`;
 
       return api.sendMessage({
         body: caption,

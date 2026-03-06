@@ -6,15 +6,15 @@ const GoatStor = "https://goatstore.vercel.app";
 module.exports = {
   config: {
     name: "goatstore",
-    aliases: ["gs", "market", "cmdstore"],
+    aliases: ["gs", "market"],
     version: "0.0.1",
-    role: 2,
+    role: 0,
     author: "ArYAN",
     shortDescription: {
-      en: "📌 Goatstore - Your Command Marketplace"
+      en: "📌 Goatstor - Your Command Marketplace"
     },
     longDescription: {
-      en: "📌 Browse, search, upload, and manage your commands in the GoatStore marketplace with easy sharing cmds."
+      en: "📌 Browse, search, upload, and manage your commands in the GoatStor marketplace with easy sharing cmds."
     },
     category: "𝗠𝗮𝗿𝗸𝗲𝘁",
     cooldowns: 0,
@@ -22,7 +22,7 @@ module.exports = {
 
   onStart: async ({ api, event, args, message }) => {
     const sendBeautifulMessage = (content) => {
-      const header = "╭──『 🐐GoatStore 』──╮\n";
+      const header = "╭──『 🐐𝗚𝗼𝗮𝘁𝗦𝘁𝗼𝗿 』──╮\n";
       const footer = "\n╰──────────────╯";
       return message.reply(header + content + footer);
     };
@@ -38,7 +38,7 @@ module.exports = {
           `╭─❯ ${event.body} status\n├ 📊 View statistics\n╰ Marketplace insights\n\n` +
           `╭─❯ ${event.body} like <ID>\n├ 💝 Like a command\n╰ Example: like 1\n\n` +
           `╭─❯ ${event.body} upload <name>\n├ ⬆️ Upload command\n╰ Example: upload goatStor\n\n` +
-          "💫 𝗧𝗶𝗽: Use `Help GoatStore` For Details"
+          "💫 𝗧𝗶𝗽: Use `Help GoatStor` For Details"
         );
       }
 
@@ -47,7 +47,7 @@ module.exports = {
       switch (command) {
         case "show": {
           const itemID = parseInt(args[1]);
-          if (isNaN(itemID)) return sendBeautifulMessage("\n[⚠️]➜ Please provide a valid item ID.");
+          if (isNaN(itemID)) return sendBeautifulMessage("\n[⚜️]➜ 𝐏𝐥𝐞𝐚𝐬𝐞 𝐩𝐫𝐨𝐯𝐢𝐝𝐞 𝐚 𝐯𝐚𝐥𝐢𝐝 𝐢𝐭𝐞𝐦 𝐈𝐃.");
           const response = await axios.get(`${GoatStor}/api/item/${itemID}`);
           const item = response.data;
           
@@ -73,7 +73,7 @@ module.exports = {
           const { data: { items, total } } = await axios.get(`${GoatStor}/api/items?page=${page}&limit=5`);
           const totalPages = Math.ceil(total / 5);
           if (page <= 0 || page > totalPages) {
-            return sendBeautifulMessage("\n[⚠️]➜ Invalid page number.");
+            return sendBeautifulMessage("\n[⚜️]➜ 𝐈𝐧𝐯𝐚𝐥𝐢𝐝 𝐩𝐚𝐠𝐞 𝐧𝐮𝐦𝐛𝐞𝐫.");
           }
           const itemsList = items.map((item, index) =>
             `╭─❯ ${index + 1}. 📦 ${item.itemName}\n` +
@@ -89,10 +89,10 @@ module.exports = {
 
         case "search": {
           const query = args.slice(1).join(" ");
-          if (!query) return sendBeautifulMessage("\n[⚠️]➜ Please provide a search query.");
+          if (!query) return sendBeautifulMessage("\n[⚜️]➜ 𝐏𝐥𝐞𝐚𝐬𝐞 𝐩𝐫𝐨𝐯𝐢𝐝𝐞 𝐚 𝐬𝐞𝐚𝐫𝐜𝐡 𝐪𝐮𝐞𝐫𝐲. ");
           const { data } = await axios.get(`${GoatStor}/api/items?search=${encodeURIComponent(query)}`);
           const results = data.items;
-          if (!results.length) return sendBeautifulMessage("\n❌ No matching results found.");
+          if (!results.length) return sendBeautifulMessage("\n❌ 𝐍𝐨 𝐦𝐚𝐭𝐜𝐡𝐢𝐧𝐠 𝐜𝐨𝐦𝐦𝐚𝐧𝐝𝐬 𝐟𝐨𝐮𝐧𝐝.");
           const searchList = results.slice(0, 5).map((item, index) =>
             `╭─❯ ${index + 1}. 📦 ${item.itemName}\n` +
             `├ 🆔 𝗜𝗗: ${item.itemID}\n` +
@@ -144,29 +144,29 @@ module.exports = {
 
         case "like": {
           const likeItemId = parseInt(args[1]);
-          if (isNaN(likeItemId)) return sendBeautifulMessage("\n[⚠️]➜ Please provide a valid item ID.");
+          if (isNaN(likeItemId)) return sendBeautifulMessage("\n[⚠️]➜ 𝐏𝐥𝐞𝐚𝐬𝐞 𝐩𝐫𝐨𝐯𝐢𝐝𝐞 𝐚 𝐯𝐚𝐥𝐢𝐝 𝐢𝐭𝐞𝐦 𝐈𝐃.");
           const { data } = await axios.post(`${GoatStor}/api/items/${likeItemId}/like`);
           if (data.success) {
             return sendBeautifulMessage(
               `\n╭─❯ ✨ 𝗦𝘁𝗮𝘁𝘂𝘀\n╰ Successfully liked!\n\n╭─❯ 💝 𝗧𝗼𝘁𝗮𝗹 𝗟𝗶𝗸𝗲𝘀\n╰ ${data.likes}`
             );
           } else {
-            return sendBeautifulMessage("\n[⚠️]➜ Failed to like the command.");
+            return sendBeautifulMessage("\n[⚜️]➜ 𝐅𝐚𝐢𝐥𝐞𝐝 𝐭𝐨 𝐥𝐢𝐤𝐞 𝐜𝐨𝐦𝐦𝐚𝐧𝐝.");
           }
         }
 
         case "upload": {
           const commandName = args[1];
-          if (!commandName) return sendBeautifulMessage("\n[⚠️]➜ Please provide a command name.");
+          if (!commandName) return sendBeautifulMessage("\n[⚜️]➜ 𝐏𝐥𝐞𝐚𝐬𝐞 𝐩𝐫𝐨𝐯𝐢𝐝𝐞 𝐚 𝐜𝐨𝐦𝐦𝐚𝐧𝐝 𝐧𝐚𝐦𝐞.");
           const commandPath = path.join(process.cwd(), 'scripts', 'cmds', `${commandName}.js`);
-          if (!fs.existsSync(commandPath)) return sendBeautifulMessage(`\n❌ File'${commandName}.js' not found`);
+          if (!fs.existsSync(commandPath)) return sendBeautifulMessage(`\n❌ 𝐅𝐢𝐥𝐞 '${commandName}.js' 𝐧𝐨𝐭 𝐟𝐨𝐮𝐧𝐝.`);
           try {
             const code = fs.readFileSync(commandPath, 'utf8');
             let commandFile;
             try {
               commandFile = require(commandPath);
             } catch (err) {
-              return sendBeautifulMessage("\n[⚠️]➜  Invalid command file.");
+              return sendBeautifulMessage("\n[⚜️]➜  𝐈𝐧𝐯𝐚𝐥𝐢𝐝 𝐜𝐨𝐦𝐦𝐚𝐧𝐝 𝐟𝐢𝐥𝐞 𝐟𝐨𝐫𝐦𝐚𝐭.");
             }
             const uploadData = {
               itemName: commandFile.config?.name || commandName,
@@ -187,19 +187,19 @@ module.exports = {
                 `╭─❯ 🔗 𝗥𝗮𝘄 𝗟𝗶𝗻𝗸\n╰ ${link}`
               );
             }
-            return sendBeautifulMessage("\n[⚠️]➜ Failed to upload the command.");
+            return sendBeautifulMessage("\n[⚜️]➜ 𝐅𝐚𝐢𝐥𝐞𝐝 𝐭𝐨 𝐮𝐩𝐥𝐨𝐚𝐝 𝐭𝐡𝐞 𝐜𝐨𝐦𝐦𝐚𝐧𝐝.");
           } catch (error) {
             console.error("Upload error:", error);
-            return sendBeautifulMessage("\n[⚠️]➜ An unexpected error occurred while uploading the command.");
+            return sendBeautifulMessage("\n[⚜️]➜ 𝐀𝐧 𝐮𝐧𝐞𝐱𝐩𝐞𝐜𝐭𝐞𝐝 𝐞𝐫𝐫𝐨𝐫 𝐨𝐜𝐜𝐮𝐫𝐫𝐞𝐝 𝐝𝐮𝐫𝐢𝐧𝐠 𝐮𝐩𝐥𝐨𝐚𝐝.");
           }
         }
 
         default:
-          return sendBeautifulMessage("\n[⚠️]➜ Invalid subcommand. Use `Help GoatStore` for options");
+          return sendBeautifulMessage("\n[⚜️]➜ 𝐈𝐧𝐯𝐚𝐥𝐢𝐝 𝐬𝐮𝐛𝐜𝐨𝐦𝐦𝐚𝐧𝐝. 𝐔𝐬𝐞 `𝐡𝐞𝐥𝐩 𝐆𝐨𝐚𝐭𝐒𝐭𝐨𝐫` 𝐟𝐨𝐫 𝐨𝐩𝐭𝐢𝐨𝐧𝐬.");
       }
     } catch (err) {
-      console.error("GoatStore Error:", err);
-      return sendBeautifulMessage("\n[⚠️]➜ An unexpected error occurred.");
+      console.error("GoatStor Error:", err);
+      return sendBeautifulMessage("\n[⚜️]➜ 𝐀𝐧 𝐮𝐧𝐞𝐱𝐩𝐞𝐜𝐭𝐞𝐝 𝐞𝐫𝐫𝐨𝐫 𝐨𝐜𝐜𝐮𝐫𝐫𝐞𝐝. 𝐏𝐥𝐞𝐚𝐬𝐞 𝐜𝐡𝐞𝐜𝐤 𝐭𝐡𝐞 𝐜𝐨𝐧𝐬𝐨𝐥𝐞 𝐟𝐨𝐫 𝐝𝐞𝐭𝐚𝐢𝐥𝐬.");
     }
   }
 };

@@ -17,7 +17,7 @@ module.exports = {
     config: {
         name: "bby",
         version: "15.0.0",
-        author: "Milon Hasan",
+        author: "Anik Islam Sadik",
         countDown: 0,
         role: 2,
         description: "Bot responds to specific nicknames with funny dialogues.",
